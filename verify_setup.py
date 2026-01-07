@@ -10,7 +10,6 @@ Usage:
 """
 
 import sys
-import os
 from pathlib import Path
 
 # Color codes for terminal output
@@ -22,34 +21,34 @@ RESET = '\033[0m'
 BOLD = '\033[1m'
 
 
-def print_header(text):
+def print_header(text: str) -> None:
     """Print a formatted header."""
     print(f"\n{BOLD}{BLUE}{'='*60}{RESET}")
     print(f"{BOLD}{BLUE}{text.center(60)}{RESET}")
     print(f"{BOLD}{BLUE}{'='*60}{RESET}\n")
 
 
-def print_success(text):
+def print_success(text: str) -> None:
     """Print success message."""
     print(f"{GREEN}✓ {text}{RESET}")
 
 
-def print_error(text):
+def print_error(text: str) -> None:
     """Print error message."""
     print(f"{RED}✗ {text}{RESET}")
 
 
-def print_warning(text):
+def print_warning(text: str) -> None:
     """Print warning message."""
     print(f"{YELLOW}⚠ {text}{RESET}")
 
 
-def print_info(text):
+def print_info(text: str) -> None:
     """Print info message."""
     print(f"{BLUE}ℹ {text}{RESET}")
 
 
-def check_python_version():
+def check_python_version() -> bool:
     """Check Python version."""
     print_header("Python Version Check")
     
@@ -64,7 +63,7 @@ def check_python_version():
         return False
 
 
-def check_dependencies():
+def check_dependencies() -> bool:
     """Check if all required packages are installed."""
     print_header("Dependency Check")
     
@@ -90,7 +89,7 @@ def check_dependencies():
     return all_installed
 
 
-def check_env_file():
+def check_env_file() -> bool:
     """Check if .env file exists."""
     print_header("Environment Configuration Check")
     
@@ -110,7 +109,7 @@ def check_env_file():
             'SECRET_KEY',
         ]
         
-        missing_vars = []
+        missing_vars: list[str] = []
         for var in required_vars:
             if var not in env_content or f'{var}=' not in env_content:
                 missing_vars.append(var)
@@ -142,7 +141,7 @@ def check_env_file():
             return False
 
 
-def check_project_structure():
+def check_project_structure() -> bool:
     """Check if all required directories and files exist."""
     print_header("Project Structure Check")
     
@@ -172,7 +171,7 @@ def check_project_structure():
     return all_exist
 
 
-def check_database():
+def check_database() -> bool:
     """Check if database can be initialized."""
     print_header("Database Check")
     
@@ -183,12 +182,12 @@ def check_database():
         init_db()
         print_success("Database initialized successfully")
         
-        # Check if database file exists
+        # Check if SQLite database file exists (dev mode)
         if Path('contractors.db').exists():
-            print_success("Database file created: contractors.db")
+            print_success("SQLite database file created: contractors.db")
             return True
         else:
-            print_warning("Database file not created (may be using different database)")
+            print_info("Using non-file database (Postgres or other)")
             return True
             
     except Exception as e:
@@ -196,7 +195,7 @@ def check_database():
         return False
 
 
-def check_imports():
+def check_imports() -> bool:
     """Check if all application modules can be imported."""
     print_header("Import Check")
     
@@ -225,7 +224,7 @@ def check_imports():
     return all_imported
 
 
-def check_fastapi_app():
+def check_fastapi_app() -> bool:
     """Check if FastAPI app can be created."""
     print_header("FastAPI Application Check")
     
@@ -235,7 +234,7 @@ def check_fastapi_app():
         print_success("FastAPI application created successfully")
         
         # Check routes
-        routes = [route.path for route in app.routes]
+        routes: list[str] = [getattr(route, 'path', '') for route in app.routes]
         print_info(f"Total routes registered: {len(routes)}")
         
         expected_routes = [
@@ -258,7 +257,7 @@ def check_fastapi_app():
         return False
 
 
-def run_all_checks():
+def run_all_checks() -> int:
     """Run all verification checks."""
     print(f"\n{BOLD}{BLUE}Construction AI Landing Page - Setup Verification{RESET}\n")
     
