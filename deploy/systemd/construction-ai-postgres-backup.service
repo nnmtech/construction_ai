@@ -1,0 +1,24 @@
+[Unit]
+Description=Construction AI - Postgres Backup
+Wants=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+
+# Update this path to where you deployed the repo.
+WorkingDirectory=/opt/construction_ai_landing
+
+# Load main app env (for POSTGRES_* vars used by the backup script)
+EnvironmentFile=/opt/construction_ai_landing/.env.prod
+
+# Optional overrides for backup config (BACKUP_DIR/KEEP_DAYS/PROJECT/COMPOSE_FILE/ENV_FILE)
+EnvironmentFile=-/opt/construction_ai_landing/deploy/systemd/postgres-backup.env
+
+ExecStart=/usr/bin/env sh /opt/construction_ai_landing/deploy/systemd/run-postgres-backup-at-3am-et.sh
+
+# Hardening (lightweight; does not require extra capabilities)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full

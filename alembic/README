@@ -1,0 +1,5 @@
+Alembic migration environment.
+
+Commands:
+- Generate a new migration: alembic revision --autogenerate -m "message"
+- Apply migrations: alembic upgrade head

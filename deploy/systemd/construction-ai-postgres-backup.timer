@@ -1,0 +1,10 @@
+[Unit]
+Description=Construction AI - Scheduled Postgres Backup
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=0
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,25 @@
+# Secrets / local env
+.env
+.env.*
+!.env.example
+!.env.prod.example
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Logs
+*.log
+
+# Backups / archives
+backups/
+
+# OS / editor
+.DS_Store
+.vscode/
+
+# Databases (local dev artifacts)
+*.sqlite
+*.db

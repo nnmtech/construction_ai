@@ -1,0 +1,66 @@
+services:
+  proxy:
+    image: traefik:v2.11
+    command:
+      - --log.level=DEBUG
+      - --providers.docker=true
+      - --providers.docker.endpoint=unix:///var/run/docker.sock
+      - --providers.docker.constraints=Label(`com.docker.compose.project`,`construction_ai_landing`)
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entryPoint.to=websecure
+      - --entrypoints.web.http.redirections.entryPoint.scheme=https
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      edge:
+        ipv4_address: 10.77.0.2
+
+  app:
+    build: .
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+
+      # Use SQLite by default (volume-backed)
+      DATABASE_URL: sqlite:////data/contractors.db
+
+      # Run Alembic migrations automatically on startup
+      RUN_MIGRATIONS_ON_STARTUP: "true"
+      AUTO_CREATE_SCHEMA: "false"
+
+      # Proxy / HTTPS behavior
+      HTTPS_REDIRECT: "true"
+      TRUST_PROXY_HEADERS: "true"
+      # Trust forwarded headers only from the reverse proxy container (static IP)
+      FORWARDED_ALLOW_IPS: "10.77.0.2"
+
+      # Host/CORS allowlists (set to your real domain in production)
+      # Include localhost/127.0.0.1 so container health checks to /health pass
+      TRUSTED_HOSTS: "app.localtest.me,localhost,127.0.0.1"
+      CORS_ORIGINS: "https://app.localtest.me"
+
+      LOG_FORMAT: "json"
+    volumes:
+      - app_data:/data
+    networks:
+      - edge
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.app.rule=Host(`app.localtest.me`)
+      - traefik.http.routers.app.entrypoints=websecure
+      - traefik.http.routers.app.tls=true
+      - traefik.http.services.app.loadbalancer.server.port=8000
+
+networks:
+  edge:
+    ipam:
+      config:
+        - subnet: 10.77.0.0/24
+
+volumes:
+  app_data:

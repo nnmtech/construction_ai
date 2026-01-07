@@ -1,0 +1,2 @@
+# Optional PostgreSQL driver (only needed if your DATABASE_URL uses postgres)
+psycopg[binary]==3.3.2

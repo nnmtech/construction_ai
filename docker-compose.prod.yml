@@ -1,0 +1,130 @@
+services:
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.1.1
+    environment:
+      LOG_LEVEL: info
+      # Allow only the minimum API surface Traefik needs.
+      CONTAINERS: 1
+      EVENTS: 1
+      INFO: 1
+      PING: 1
+      VERSION: 1
+      NETWORKS: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    networks:
+      edge:
+        ipv4_address: 10.78.0.10
+
+  proxy:
+    image: traefik:v2.11
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      PROXY_HTTP_PORT: ${PROXY_HTTP_PORT:-80}
+      PROXY_HTTPS_PORT: ${PROXY_HTTPS_PORT:-443}
+      PROXY_BEHIND_LB: ${PROXY_BEHIND_LB:-false}
+      EXTERNAL_HTTP_PORT: ${EXTERNAL_HTTP_PORT:-80}
+      EXTERNAL_HTTPS_PORT: ${EXTERNAL_HTTPS_PORT:-443}
+      TRAEFIK_ACME_EMAIL: ${TRAEFIK_ACME_EMAIL}
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command:
+      - |
+        if [ "${ENVIRONMENT:-}" = "production" ]; then
+          if [ "${PROXY_HTTP_PORT:-80}" != "80" ] || [ "${PROXY_HTTPS_PORT:-443}" != "443" ]; then
+            if [ "${PROXY_BEHIND_LB:-false}" != "true" ] || [ "${EXTERNAL_HTTP_PORT:-}" != "80" ] || [ "${EXTERNAL_HTTPS_PORT:-}" != "443" ]; then
+              echo >&2 "[proxy] Refusing to start: production requires ports 80/443 OR PROXY_BEHIND_LB=true with EXTERNAL_HTTP_PORT=80 and EXTERNAL_HTTPS_PORT=443"
+              exit 1
+            fi
+          fi
+        fi
+
+        exec traefik \
+          --log.level=INFO \
+          --providers.docker=true \
+          --providers.docker.endpoint=tcp://socket-proxy:2375 \
+          '--providers.docker.constraints=Label(`com.docker.compose.project`,`construction_ai_landing_prod`)' \
+          --providers.docker.exposedbydefault=false \
+          --entrypoints.web.address=:80 \
+          --entrypoints.websecure.address=:443 \
+          --entrypoints.web.http.redirections.entryPoint.to=websecure \
+          --entrypoints.web.http.redirections.entryPoint.scheme=https \
+          --certificatesresolvers.le.acme.email=${TRAEFIK_ACME_EMAIL} \
+          --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json \
+          --certificatesresolvers.le.acme.httpchallenge=true \
+          --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+    ports:
+      - "${PROXY_HTTP_PORT:-80}:80"
+      - "${PROXY_HTTPS_PORT:-443}:443"
+    depends_on:
+      - socket-proxy
+    volumes:
+      - letsencrypt:/letsencrypt
+    restart: unless-stopped
+    networks:
+      edge:
+        ipv4_address: 10.78.0.2
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      edge:
+        ipv4_address: 10.78.0.11
+
+  app:
+    build: .
+    env_file:
+      - .env.prod
+    environment:
+      # Proxy / HTTPS behavior
+      HTTPS_REDIRECT: "true"
+      TRUST_PROXY_HEADERS: "true"
+      # Trust forwarded headers only from the reverse proxy container (static IP)
+      FORWARDED_ALLOW_IPS: "10.78.0.2"
+
+      # Host/CORS allowlists (set DOMAIN in .env.prod)
+      TRUSTED_HOSTS: "${DOMAIN},127.0.0.1"
+      CORS_ORIGINS: "https://${DOMAIN}"
+
+      LOG_FORMAT: "json"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - app_data:/data
+    restart: unless-stopped
+    networks:
+      edge:
+        ipv4_address: 10.78.0.3
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.app-prod.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.app-prod.entrypoints=websecure
+      - traefik.http.routers.app-prod.tls=true
+      - traefik.http.routers.app-prod.tls.certresolver=le
+      - traefik.http.services.app-prod.loadbalancer.server.port=8000
+
+networks:
+  edge:
+    ipam:
+      config:
+        - subnet: 10.78.0.0/24
+
+volumes:
+  app_data:
+  letsencrypt:
+  postgres_data:
