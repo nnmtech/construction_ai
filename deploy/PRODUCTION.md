@@ -31,6 +31,15 @@ If you keep `RUN_MIGRATIONS_ON_STARTUP=true`, startup will fail if migrations fa
   - `./scripts/postgres-backup.sh`
 - Store backups off-host and set retention.
 
+### Full restore (includes Docker volumes)
+If you want a full machine-level restore (including raw Docker volumes like Postgres data and Traefik ACME state):
+- Create raw volume backups: `./scripts/backup-prod-volumes.sh`
+- Create a single archive bundle: `./scripts/full-backup.sh`
+
+Restore notes:
+- Stop the stack before restoring volumes.
+- Use `./scripts/docker-volume-restore.sh <volume> <archive.tar.gz>` for each volume.
+
 ## 6) Preflight checks
 - Run:
   - `./scripts/prod-preflight.sh`
